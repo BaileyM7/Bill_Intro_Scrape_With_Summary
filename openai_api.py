@@ -157,7 +157,7 @@ def callApiWithText(text, client, url, is_senate, filename_only=False):
         # add_invalid_url(url)
         return "NA", None, None
     
-    filename = f"$H billintros-{file_date}-s{bill_number}" if is_senate else f"$H billintroh-{file_date}-hr{bill_number}"
+    filename = f"$H billSums-{file_date}-s{bill_number}" if is_senate else f"$H billSumh-{file_date}-hr{bill_number}"
 
     if filename_only:
         return filename, None, None

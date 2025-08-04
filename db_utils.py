@@ -1,4 +1,5 @@
 import sys
+import csv
 import yaml
 import logging
 import openai_api
@@ -6,7 +7,9 @@ import mysql.connector
 from datetime import datetime
 from db_utils import get_db_connection
 from mysql.connector import IntegrityError, DataError
+from openai_api import getKey, callApiWithText, OpenAI
 from url_processing import get_most_recent_bill_number
+from url_processing import getDynamicUrlText, extract_sponsor_phrase
 
 
 def get_db_connection(yml_path="configs/db_config.yml"):
@@ -26,7 +29,7 @@ def get_max_bill_number_from_db(chamber):
     try:
         cursor.execute("""
             SELECT MAX(CAST(SUBSTRING_INDEX(url, '/', -1) AS UNSIGNED))
-            FROM url_queue
+            FROM sum_queue
             WHERE chamber = %s
         """, (chamber,))
         result = cursor.fetchone()[0]
@@ -47,7 +50,7 @@ def insert_new_bills(chamber, last_known, latest_number):
             try:
                 logging.debug(f"TRYING TO INSERT new {chamber} bill: {num}")
                 cursor.execute("""
-                    INSERT INTO url_queue (url, chamber, status)
+                    INSERT INTO sum_queue (url, chamber, status)
                     VALUES (%s, %s, 'pending')
                 """, (url, chamber))
 
@@ -154,6 +157,50 @@ def load_sources_sql(filepath="sources.dmp.sql"):
         if conn:
             conn.close()
 
+def run_tester(num, is_senate):
+    client = OpenAI(api_key=getKey())
 
+    house = "senate" if is_senate else "house"
+    url = f"https://www.congress.gov/bill/119th-congress/{house}-bill/{num}"
+
+    content = getDynamicUrlText(url, is_senate)
+
+    if not content:
+        return "", "", "" 
+
+    bill_sponsor_blob = extract_sponsor_phrase(content)
+
+    filename, headline, press_release = callApiWithText(
+        text=content,
+        client=client,
+        url=url,
+        is_senate=is_senate,
+        filename_only=True  
+    )
+
+    return filename, headline, press_release
+
+
+# populate test csv for testing purposes
 def populateCsv(num_range):
+    # total arr holding all bill intros
+    bill_intros = []
+
+    # running all the bill numbers in the range for house
+    for i in range(num_range[0], num_range[1]):
+        bill_intros.append(run_tester(i, True))
     
+    # running all the bill numbers in the range for senate
+    for i in range(num_range[0], num_range[1]):
+        bill_intros.append(run_tester(i, False))
+    
+    # write to CSV (overwriting if exists)
+    with open('test_outputs.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['FileName', 'Headline', 'Press release'])  # header
+
+        for entry in bill_intros:
+            # assuming entry is a tuple like (filename, headline, press_release)
+            writer.writerow(entry)
+    
+        

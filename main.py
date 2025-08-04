@@ -72,7 +72,7 @@ def main(argv):
         print("Must specify -s or -h")
         sys.exit(1)
 
-    # Optional behaviors
+    # optional behaviors
     if populate_first:
         populateDB()
 
@@ -139,8 +139,6 @@ def main(argv):
             filename_only=False
         )
 
-        # print(f"FILENAME: {filename} \n\n HEADLINE: {headline} \n\n PRESS_RELEASE: {press_release}")
-
         if filename == "STOP":
             stopped = True
             break
@@ -167,7 +165,7 @@ def main(argv):
     summary = f"""
 Load Version 1.0.0 08/4/2025
 
-Passed Parameters: {' -t' if test_run else ''} {' -S' if is_senate else ' -H'}
+Passed Parameters: {' -t' if test_run else ''}  {' -p' if populate_first else ''} {' -S' if is_senate else ' -H'}
 Pull House and Senate: {'Senate' if is_senate else 'House'}
 
 Docs Loaded: {processed}
