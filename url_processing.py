@@ -2,72 +2,117 @@ import re
 import html
 import logging
 import requests
-from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
 
 arr = []
 invalidArr = []
-BASE_URL = "https://api.congress.gov/v3/bill"
+API_BASE = "https://api.congress.gov/v3/bill"
 
-# now uses api to get it instead of webscraping
+def strip_tags(html_text):
+    # Quick HTML tag stripper using regex
+    return re.sub(r"<[^>]+>", "", html_text).strip()
+
 def getTextandSummary(url, is_senate):
     with open("utils/govkey.txt") as f:
         api_key = f.read().strip()
 
     congress = 119
-
     bill_number = url.rstrip("/").split("/")[-1]
     print("Bill number:", bill_number)
 
     bill_type = "s" if is_senate else "hr"
-
-    headers = {"X-API-Key": api_key, "Accept": "application/xml"}
-    base_path = f"{BASE_URL}/{congress}/{bill_type}/{bill_number}"
-
-    # === Get Summary XML ===
-    summary_url = f"{base_path}/summaries"
-    summary_resp = requests.get(summary_url, headers=headers)
-    summary_root = ET.fromstring(summary_resp.content)
-
-    # Get the last <summary><cdata><text> element
+    headers = {"X-API-Key": api_key}
     summary_text = None
-    summaries = summary_root.findall(".//summary")
-    if summaries:
-        latest_summary = summaries[-1]  # most recent version
-        cdata = latest_summary.find(".//text")
-        if cdata is not None and cdata.text:
-            summary_text = html.unescape(cdata.text.strip())
-
-    # === Get Text XML ===
-    text_url = f"{base_path}/text"
-    text_resp = requests.get(text_url, headers=headers)
-    text_root = ET.fromstring(text_resp.content)
-
-    # Get first <textVersions><item><formats><item><url> for HTML
-    html_text_url = None
-    first_text_item = text_root.find(".//textVersions/item")
-    if first_text_item is not None:
-        formats = first_text_item.findall(".//formats/item")
-        for f in formats:
-            type_tag = f.find("type")
-            url_tag = f.find("url")
-            if type_tag is not None and "Formatted Text" in type_tag.text:
-                html_text_url = url_tag.text.strip()
-                break
-
     bill_text = None
-    if html_text_url:
-        try:
-            bill_html = requests.get(html_text_url)
-            bill_html.raise_for_status()
-            soup = BeautifulSoup(bill_html.content, "html.parser")
-            # Remove script, nav, header, footer tags
-            for tag in soup(["script", "style", "nav", "header", "footer"]):
-                tag.decompose()
-            bill_text = soup.get_text(separator="\n", strip=True)
-        except Exception as e:
-            print(f"Failed to fetch or parse bill text HTML: {e}")
 
+    # === Get Summary ===
+    summary_url = f"{API_BASE}/{congress}/{bill_type}/{bill_number}/summaries"
+    summary_resp = requests.get(summary_url, headers=headers)
+
+    # print(f"\n[SUMMARY] Status: {summary_resp.status_code}")
+    # print("Content-Type:", summary_resp.headers.get("Content-Type"))
+    # print("Summary Body Preview:\n", summary_resp.text[:1000])
+
+    if summary_resp.ok and summary_resp.headers.get("Content-Type", "").startswith("application/json"):
+        if summary_resp.content.strip():
+            try:
+                data = summary_resp.json()
+                summaries = data.get("summaries", [])
+                if summaries:
+                    latest = summaries[-1]
+                    raw_html = latest.get("text", "")
+                    summary_text = html.unescape(strip_tags(raw_html))
+            except Exception as e:
+                print(f"Error parsing summary JSON for {bill_number}: {e}")
+        else:
+            print(f"Empty summary response for {bill_number}")
+    elif summary_resp.ok and summary_resp.headers.get("Content-Type", "").startswith("application/xml"):
+        try:
+            root = ET.fromstring(summary_resp.content)
+            summaries = root.findall(".//summary")
+            if summaries:
+                latest = summaries[-1]
+                text_elem = latest.find(".//text")
+                if text_elem is not None and text_elem.text:
+                    summary_text = html.unescape(text_elem.text.strip())
+                    print("[XML SUMMARY] Parsed from fallback XML")
+        except Exception as e:
+            print(f"Error parsing summary XML for {bill_number}: {e}")
+    else:
+        print(f"Summary fetch failed for {bill_number}")
+
+    # === Get Formatted Text HTML ===
+    text_url = f"{API_BASE}/{congress}/{bill_type}/{bill_number}/text"
+    text_resp = requests.get(text_url, headers=headers)
+
+    # print(f"\n[TEXT METADATA] Status: {text_resp.status_code}")
+    # print("Content-Type:", text_resp.headers.get("Content-Type"))
+    # print("Text Metadata Body Preview:\n", text_resp.text[:1000])
+
+    formatted_url = None
+    if text_resp.ok and text_resp.headers.get("Content-Type", "").startswith("application/json"):
+        if text_resp.content.strip():
+            try:
+                data = text_resp.json()
+                versions = data.get("textVersions", [])
+                if versions:
+                    for fmt in versions[0].get("formats", []):
+                        if fmt.get("type") == "Formatted Text":
+                            formatted_url = fmt.get("url")
+                            break
+            except Exception as e:
+                print(f"Error parsing text JSON for {bill_number}: {e}")
+        else:
+            print(f"Empty bill text response for {bill_number}")
+    elif text_resp.ok and text_resp.headers.get("Content-Type", "").startswith("application/xml"):
+        try:
+            root = ET.fromstring(text_resp.content)
+            item = root.find(".//textVersions/item")
+            if item is not None:
+                formats = item.findall(".//formats/item")
+                for fmt in formats:
+                    type_elem = fmt.find("type")
+                    url_elem = fmt.find("url")
+                    if type_elem is not None and "Formatted Text" in type_elem.text:
+                        formatted_url = url_elem.text.strip()
+                        break
+            # print("[XML TEXT] Parsed from fallback XML")
+        except Exception as e:
+            print(f"Error parsing text XML for {bill_number}: {e}")
+    else:
+        print(f"Text metadata fetch failed for {bill_number}")
+
+    if formatted_url:
+        raw_html_resp = requests.get(formatted_url)
+        # print(f"\n[FORMATTED TEXT HTML] Status: {raw_html_resp.status_code}")
+        # print("Formatted Text URL:", formatted_url)
+        # print("HTML Body Preview:\n", raw_html_resp.text[:1000])
+
+        if raw_html_resp.ok:
+            bill_text = html.unescape(strip_tags(raw_html_resp.text))
+        else:
+            print(f"Formatted text HTML fetch failed: {raw_html_resp.status_code}")
+    # print(bill_text, summary_text)
     return bill_text, summary_text
 
 def get_primary_sponsor(is_senate, congress_num, bill_number):

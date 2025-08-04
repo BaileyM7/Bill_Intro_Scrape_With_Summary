@@ -236,7 +236,8 @@ def run_tester(num, is_senate):
 
     logging.debug(f"result for {house.title()} Bill {num}: {(filename, headline, press_release)}")
 
-    press_release = press_release + f"\n\n* * # * *\n\nPrimary source of information: {url}"
+    if press_release:
+        press_release = press_release + f"\n\n* * # * *\n\nPrimary source of information: {url}"
 
     return filename, headline, press_release
 
@@ -255,7 +256,7 @@ def populateCsv(num_range):
     
     # running all the bill numbers in the range for senate
     for i in range(num_range[0], num_range[1]):
-        result = run_tester(i, True)
+        result = run_tester(i, False)
         logging.debug(f"result for House Bill {i}: {result}")
         bill_intros.append(result)
     
