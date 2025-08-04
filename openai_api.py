@@ -184,6 +184,8 @@ def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
     Bill Details:
     {'Sen.' if is_senate else 'Rep.'} [Last Name] has introduced [Bill Name]. 
     Summary of the bill:
+    {summary}
+    Full Bill Text:
     {text}
     Primary Sponsor's Name and State Code: 
     {fullname}

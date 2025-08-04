@@ -215,13 +215,15 @@ def run_tester(num, is_senate):
 
     content, summary = getTextandSummary(url, is_senate)
 
-    if not content:
-        logging.debug(f"❌ No content for {house.title()} Bill {num}")
+    if not summary:
+        logging.debug(f"No summary for {house.title()} Bill {num}")
         return "", "", "" 
 
-    logging.debug(f"✅ Got content for {house.title()} Bill {num} (length={len(content)})")
+    if not content:
+        logging.debug(f"No content for {house.title()} Bill {num}")
+        return "", "", "" 
 
-    bill_sponsor_blob = extract_sponsor_phrase(content)
+    logging.debug(f"Got content for {house.title()} Bill {num} (length={len(content)})")
 
     filename, headline, press_release = callApiWithText(
         text=content,
@@ -233,6 +235,9 @@ def run_tester(num, is_senate):
     )
 
     logging.debug(f"result for {house.title()} Bill {num}: {(filename, headline, press_release)}")
+
+    press_release = press_release + f"\n\n* * # * *\n\nPrimary source of information: {url}"
+
     return filename, headline, press_release
 
 
