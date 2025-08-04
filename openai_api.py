@@ -127,7 +127,7 @@ def extract_found_ids(press_release):
     # print(len(found_ids))
     return found_ids
 
-def callApiWithText(text, client, url, is_senate, filename_only=False):
+def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
     # gathering info to then create the output for filename, headline, and body
     today = datetime.today()
     text = re.sub(r'https://www\.congress\.gov[^\s]*', '', text)

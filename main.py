@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from email_utils import send_summary_email
 from openai_api import callApiWithText, OpenAI
-from url_processing import getDynamicUrlText, extract_sponsor_phrase
+from url_processing import getTextandSummary, extract_sponsor_phrase
 from db_utils import get_db_connection, populateDB, populateCsv, insert_story, load_pending_urls_from_db, mark_url_processed, link_story_to_url, add_note_to_url
 from shared_utils import getKey
 
@@ -101,10 +101,15 @@ def main(argv):
         if 'congress.gov' in url and not url.endswith('/text'):
             url += '/text'
 
-        content = getDynamicUrlText(url, is_senate)
+        content, summary = getTextandSummary(url, is_senate)
 
         if not content:
-            add_note_to_url(url_id, "No content extracted: broken link")
+            add_note_to_url(url_id, "No text found yet")
+            passed += 1
+            continue
+        
+        if not summary:
+            add_note_to_url(url_id, "No summary found yet")
             passed += 1
             continue
 
@@ -112,6 +117,7 @@ def main(argv):
 
         filename_preview, _, _ = callApiWithText(
             text=content,
+            summary=summary,
             client=client,
             url=url,
             is_senate=is_senate,

@@ -1,76 +1,74 @@
 import re
-import requests
 import html
 import logging
+import requests
+from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
 
 arr = []
 invalidArr = []
+BASE_URL = "https://api.congress.gov/v3/bill"
 
 # now uses api to get it instead of webscraping
-def getDynamicUrlText(url, is_senate):
-    """Fetch bill text using Congress.gov API and fallback to govinfo.gov."""
+def getTextandSummary(url, is_senate):
     with open("utils/govkey.txt") as f:
         api_key = f.read().strip()
 
     congress = 119
 
-    match = re.search(r'/bill/(\d+)[a-z\-]*/(senate|house)-bill/(\d+)', url)
-    if not match:
-        # logging.info(f"Unable to parse bill info from URL: {url}")
-        # add_invalid_url(url)
-        return None
+    bill_number = url.rstrip("/").split("/")[-1]
+    print("Bill number:", bill_number)
 
-    _, bill_type_text, bill_number = match.groups()
     bill_type = "s" if is_senate else "hr"
 
-    api_url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{bill_number}/text"
-    # logging.info(api_url)
-    headers = {"X-API-Key": api_key}
+    headers = {"X-API-Key": api_key, "Accept": "application/xml"}
+    base_path = f"{BASE_URL}/{congress}/{bill_type}/{bill_number}"
 
-    try:
-        response = requests.get(api_url, headers=headers)
-        response.raise_for_status()  # raises HTTPError for 4xx or 5xx
-    except requests.exceptions.RequestException as e:
-        logging.info(f"[ERROR] Failed to fetch bill text for {url}: {e}")
-        # add_invalid_url(url)
-        return None
+    # === Get Summary XML ===
+    summary_url = f"{base_path}/summaries"
+    summary_resp = requests.get(summary_url, headers=headers)
+    summary_root = ET.fromstring(summary_resp.content)
 
-    if response.status_code == 200:
-        data = response.json()
-        versions = data.get("billText", {}).get("versions", [])
-        for version in versions:
-            for fmt in version.get("formats", []):
-                if fmt["format"] == "html":
-                    html_url = fmt["url"]
-                    html_response = requests.get(html_url)
-                    if html_response.status_code == 200:
-                        text = html_response.text.replace("<html><body><pre>", "").strip()
-                        return text
-        #             else:
-        #                 logging.info(f"Failed to fetch HTML content: {html_response.status_code}")
-        # logging.info("HTML version not found in formats.")
-    # else:
-    #     logging.info(f"Congress API failed: {response.status_code}")
+    # Get the last <summary><cdata><text> element
+    summary_text = None
+    summaries = summary_root.findall(".//summary")
+    if summaries:
+        latest_summary = summaries[-1]  # most recent version
+        cdata = latest_summary.find(".//text")
+        if cdata is not None and cdata.text:
+            summary_text = html.unescape(cdata.text.strip())
 
-    # Fallback: govinfo.gov
-    #logging.info("Trying govinfo.gov...")
-    if is_senate:
-        govinfo_url = f"https://www.govinfo.gov/content/pkg/BILLS-{congress}{bill_type}{bill_number}is/html/BILLS-{congress}{bill_type}{bill_number}is.htm"
-    else:
+    # === Get Text XML ===
+    text_url = f"{base_path}/text"
+    text_resp = requests.get(text_url, headers=headers)
+    text_root = ET.fromstring(text_resp.content)
 
-        govinfo_url = f"https://www.govinfo.gov/content/pkg/BILLS-{congress}{bill_type}{bill_number}ih/html/BILLS-{congress}{bill_type}{bill_number}ih.htm"
-        
-    response = requests.get(govinfo_url)
-    if response.status_code == 200:
+    # Get first <textVersions><item><formats><item><url> for HTML
+    html_text_url = None
+    first_text_item = text_root.find(".//textVersions/item")
+    if first_text_item is not None:
+        formats = first_text_item.findall(".//formats/item")
+        for f in formats:
+            type_tag = f.find("type")
+            url_tag = f.find("url")
+            if type_tag is not None and "Formatted Text" in type_tag.text:
+                html_text_url = url_tag.text.strip()
+                break
 
-        if "Page Not Found" in response.text or "Error occurred" in response.text:
-            return None
-        
-        return response.text
-    else:
-        # logging.info("Bill text not yet published on govinfo.gov.")
-        # add_invalid_url(url)
-        return None
+    bill_text = None
+    if html_text_url:
+        try:
+            bill_html = requests.get(html_text_url)
+            bill_html.raise_for_status()
+            soup = BeautifulSoup(bill_html.content, "html.parser")
+            # Remove script, nav, header, footer tags
+            for tag in soup(["script", "style", "nav", "header", "footer"]):
+                tag.decompose()
+            bill_text = soup.get_text(separator="\n", strip=True)
+        except Exception as e:
+            print(f"Failed to fetch or parse bill text HTML: {e}")
+
+    return bill_text, summary_text
 
 def get_primary_sponsor(is_senate, congress_num, bill_number):
     """
