@@ -1,47 +1,10 @@
 import re
-import csv
 import requests
-from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
-from db_utils import get_db_connection
 import html
 import logging
 
 arr = []
 invalidArr = []
-
-
-def load_pending_urls_from_db(is_senate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            SELECT id, url FROM url_queue
-            WHERE status = 'pending' AND chamber = %s
-            LIMIT 2000
-        """, ('senate' if is_senate else 'house',))
-        return cursor.fetchall()  # returns list of (id, url)
-    finally:
-        conn.close()
-
-def mark_url_processed(url_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE url_queue SET status = 'processed' WHERE id = %s", (url_id,))
-        conn.commit()
-    finally:
-        conn.close()
-
-def mark_url_invalid(url_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE url_queue SET status = 'invalid' WHERE id = %s", (url_id,))
-        conn.commit()
-    finally:
-        conn.close()
-
 
 # now uses api to get it instead of webscraping
 def getDynamicUrlText(url, is_senate):
@@ -83,7 +46,12 @@ def getDynamicUrlText(url, is_senate):
                     if html_response.status_code == 200:
                         text = html_response.text.replace("<html><body><pre>", "").strip()
                         return text
-                    
+        #             else:
+        #                 logging.info(f"Failed to fetch HTML content: {html_response.status_code}")
+        # logging.info("HTML version not found in formats.")
+    # else:
+    #     logging.info(f"Congress API failed: {response.status_code}")
+
     # Fallback: govinfo.gov
     #logging.info("Trying govinfo.gov...")
     if is_senate:
@@ -176,26 +144,6 @@ def extract_sponsor_phrase(html_string):
     if match:
         return ' '.join(match.group(1).split())  # normalize whitespace
     return None
-
-# method adds story id from inserted story into url queue
-def link_story_to_url(url_id, s_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE url_queue SET story_id = %s WHERE id = %s", (s_id, url_id))
-        conn.commit()
-    finally:
-        conn.close()
-
-# adds note to url in url queue
-def add_note_to_url(url_id, message):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE url_queue SET notes = %s WHERE id = %s", (message, url_id))
-        conn.commit()
-    finally:
-        conn.close()
 
 def get_most_recent_bill_number(is_senate, congress=119):
     """

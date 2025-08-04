@@ -3,14 +3,14 @@ import sys
 import getopt
 import logging
 from datetime import datetime
-from db_utils import get_db_connection
 from email_utils import send_summary_email
-from db_utils import populateDB, populateCsv, insert_story
-from openai_api import getKey, callApiWithText, OpenAI
-from url_processing import getDynamicUrlText, load_pending_urls_from_db, mark_url_processed, extract_sponsor_phrase, link_story_to_url, add_note_to_url
+from openai_api import callApiWithText, OpenAI
+from url_processing import getDynamicUrlText, extract_sponsor_phrase
+from db_utils import get_db_connection, populateDB, populateCsv, insert_story, load_pending_urls_from_db, mark_url_processed, link_story_to_url, add_note_to_url
+from shared_utils import getKey
 
 # --- Logging Setup ---
-logfile = f"scrape_log.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+logfile = f"logs/scrape_log.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
@@ -35,29 +35,35 @@ def main(argv):
     test_range = None
     populate_first = False
 
-    # Handle optional -p flag
-    if '-p' in argv:
-        populate_first = True
-        argv.remove('-p')
-
-    # Handle -t number number
+    # First: check if -t mode
     if '-t' in argv:
+        if '-p' in argv or '-s' in argv or '-h' in argv:
+            print("Error: -t cannot be used with -p, -s, or -h")
+            sys.exit(1)
+
         t_index = argv.index('-t')
         try:
             start = int(argv[t_index + 1])
             end = int(argv[t_index + 2])
             test_range = (start, end)
             test_run = True
-            # Remove -t and its arguments
-            argv = argv[:t_index] + argv[t_index + 3:]
         except (IndexError, ValueError):
             print("Error: -t must be followed by two integer arguments")
             sys.exit(1)
 
+        # run -t and exit early
+        populateCsv(test_range)
+        return
+
+    # Not in test mode: process -p, -s, -h
+    if '-p' in argv:
+        populate_first = True
+        argv.remove('-p')
+
     try:
         opts, args = getopt.getopt(argv, "sh")
     except getopt.GetoptError:
-        print("Usage: [-p] [-t start end] -s|-h")
+        print("Usage: [-p] -s|-h")
         sys.exit(1)
 
     for opt, _ in opts:
@@ -69,7 +75,7 @@ def main(argv):
             a_id = 57
 
     if is_senate is None:
-        print("Must specify -s or -h")
+        print("Error: Must specify -s or -h (unless using -t)")
         sys.exit(1)
 
     # optional behaviors

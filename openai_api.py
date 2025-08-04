@@ -65,19 +65,6 @@ state_ids = {
  'WY' :117,                         
 }
 
-# gets the api keys
-def getKey():
-    """Retrieves the OpenAI API key from a file."""
-    try:
-        with open("utils/key.txt", "r") as file:
-            return file.readline().strip()
-    except FileNotFoundError:
-        print("File not found!")
-    except PermissionError:
-        print("You don't have permission to access this file.")
-    except IOError as e:
-        print(f"An I/O error occurred: {e}")
-
 # Cleans text for readability and ASCII compliance.
 def clean_text(text):
     text = cleanup_text(text)  # Replace non-ASCII chars

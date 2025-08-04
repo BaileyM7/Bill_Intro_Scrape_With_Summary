@@ -2,14 +2,13 @@ import sys
 import csv
 import yaml
 import logging
-import openai_api
 import mysql.connector
 from datetime import datetime
-from db_utils import get_db_connection
 from mysql.connector import IntegrityError, DataError
-from openai_api import getKey, callApiWithText, OpenAI
-from url_processing import get_most_recent_bill_number
-from url_processing import getDynamicUrlText, extract_sponsor_phrase
+from openai_api import callApiWithText, OpenAI
+from url_processing import get_most_recent_bill_number, getDynamicUrlText, extract_sponsor_phrase
+from shared_utils import getKey
+import openai_api
 
 
 def get_db_connection(yml_path="configs/db_config.yml"):
@@ -21,6 +20,57 @@ def get_db_connection(yml_path="configs/db_config.yml"):
         password=config["password"],
         database=config["database"]
     )
+
+def load_pending_urls_from_db(is_senate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, url FROM url_queue
+            WHERE status = 'pending' AND chamber = %s
+            LIMIT 2000
+        """, ('senate' if is_senate else 'house',))
+        return cursor.fetchall()  # returns list of (id, url)
+    finally:
+        conn.close()
+
+def mark_url_processed(url_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE url_queue SET status = 'processed' WHERE id = %s", (url_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+def mark_url_invalid(url_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE url_queue SET status = 'invalid' WHERE id = %s", (url_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+# method adds story id from inserted story into url queue
+def link_story_to_url(url_id, s_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE url_queue SET story_id = %s WHERE id = %s", (s_id, url_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+# adds note to url in url queue
+def add_note_to_url(url_id, message):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE url_queue SET notes = %s WHERE id = %s", (message, url_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 def get_max_bill_number_from_db(chamber):
     """Returns the highest bill number in the database for the given chamber."""
@@ -166,7 +216,10 @@ def run_tester(num, is_senate):
     content = getDynamicUrlText(url, is_senate)
 
     if not content:
+        logging.debug(f"❌ No content for {house.title()} Bill {num}")
         return "", "", "" 
+
+    logging.debug(f"✅ Got content for {house.title()} Bill {num} (length={len(content)})")
 
     bill_sponsor_blob = extract_sponsor_phrase(content)
 
@@ -175,10 +228,12 @@ def run_tester(num, is_senate):
         client=client,
         url=url,
         is_senate=is_senate,
-        filename_only=True  
+        filename_only=False  
     )
 
+    logging.debug(f"result for {house.title()} Bill {num}: {(filename, headline, press_release)}")
     return filename, headline, press_release
+
 
 
 # populate test csv for testing purposes
@@ -188,11 +243,15 @@ def populateCsv(num_range):
 
     # running all the bill numbers in the range for house
     for i in range(num_range[0], num_range[1]):
-        bill_intros.append(run_tester(i, True))
+        result = run_tester(i, True)
+        logging.debug(f"result for Senate Bill {i}: {result}")
+        bill_intros.append(result)
     
     # running all the bill numbers in the range for senate
     for i in range(num_range[0], num_range[1]):
-        bill_intros.append(run_tester(i, False))
+        result = run_tester(i, True)
+        logging.debug(f"result for House Bill {i}: {result}")
+        bill_intros.append(result)
     
     # write to CSV (overwriting if exists)
     with open('test_outputs.csv', 'w', newline='', encoding='utf-8') as f:
