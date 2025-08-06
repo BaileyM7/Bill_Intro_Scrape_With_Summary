@@ -103,13 +103,6 @@ def get_date_from_text(text, is_file):
             return None
     return None
 
-# def get_date_from_cosponsor_summary(text):
-#     match = re.search(r'introduced on (\d{2})/(\d{2})/(\d{4})', text)
-#     if match:
-#         mm, dd, yyyy = match.groups()
-#         return f"{yyyy[-2:]}{mm}{dd}"
-#     return None
-
 def extract_found_ids(press_release):
     global found_ids
     found_ids = {}

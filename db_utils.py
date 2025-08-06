@@ -10,7 +10,7 @@ from url_processing import get_most_recent_bill_number, getTextandSummary, extra
 from shared_utils import getKey
 import openai_api
 
-
+# getts the db connection
 def get_db_connection(yml_path="configs/db_config.yml"):
     with open(yml_path, "r") as yml_file:
         config = yaml.load(yml_file, Loader=yaml.FullLoader)
@@ -21,6 +21,7 @@ def get_db_connection(yml_path="configs/db_config.yml"):
         database=config["database"]
     )
 
+# loads up to 2000 house or senate urls that are still pending
 def load_pending_urls_from_db(is_senate):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -34,6 +35,7 @@ def load_pending_urls_from_db(is_senate):
     finally:
         conn.close()
 
+# marks a bill thats been inserted into the DB so that it isnt looked at again
 def mark_url_processed(url_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -43,6 +45,7 @@ def mark_url_processed(url_id):
     finally:
         conn.close()
 
+# used to mark url invalid if it breaks rules set my program
 def mark_url_invalid(url_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -72,6 +75,7 @@ def add_note_to_url(url_id, message):
     finally:
         conn.close()
 
+# gets the max bill number for DB (to be used to add all new urls from DB MAX to new most recent bill num)
 def get_max_bill_number_from_db(chamber):
     """Returns the highest bill number in the database for the given chamber."""
     conn = get_db_connection()
@@ -89,6 +93,7 @@ def get_max_bill_number_from_db(chamber):
     finally:
         conn.close()
 
+# inserts all bills from previous MAX to new largest bill num into the TNS DB
 def insert_new_bills(chamber, last_known, latest_number):
     """Inserts new bill URLs into the queue based on the difference between latest and known max."""
     conn = get_db_connection()
@@ -112,6 +117,7 @@ def insert_new_bills(chamber, last_known, latest_number):
     finally:
         conn.close()
 
+# This func combines the previous two functions
 def populateDB():
     """Main function to find the latest House and Senate bill numbers and queue missing ones."""
 
@@ -128,7 +134,7 @@ def populateDB():
         if senate_latest > current_max_senate:
             insert_new_bills("senate", current_max_senate, senate_latest)
 
-# --- Insert Story Function ---
+# inserts story into the TNS DB
 def insert_story(filename, headline, body, a_id, sponsor_blob):
     try:
         conn = get_db_connection()
@@ -162,10 +168,10 @@ def insert_story(filename, headline, body, a_id, sponsor_blob):
             sponsor_blob
         ))
 
-        # Get story ID s_id
+        # get story ID s_id
         s_id = cursor.lastrowid
 
-        # Insert state tags into story_tag
+        # insert state tags into story_tag
         tag_insert_sql = "INSERT INTO story_tag (id, tag_id) VALUES (%s, %s)"
         for state_abbr, tag_id in openai_api.found_ids.items():
             cursor.execute(tag_insert_sql, (s_id, tag_id))
@@ -181,7 +187,7 @@ def insert_story(filename, headline, body, a_id, sponsor_blob):
         if conn:
             conn.close()
 
-# --- Load Sources SQL Dump ---
+# loading the sources DB so I can model it locally
 def load_sources_sql(filepath="sources.dmp.sql"):
     try:
         conn = get_db_connection()
@@ -207,6 +213,7 @@ def load_sources_sql(filepath="sources.dmp.sql"):
         if conn:
             conn.close()
 
+# runs the given bill chamber and number and returns the results to be added to the test_outputs.csv
 def run_tester(num, is_senate):
     client = OpenAI(api_key=getKey())
 
