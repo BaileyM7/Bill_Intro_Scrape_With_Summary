@@ -145,7 +145,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     day_format = '%-d' if platform.system() != 'Windows' else '%#d'
     today_date = f"{formatted_month} {today.strftime(day_format)}"
     bill_number = urlparse(url).path.rstrip("/").split("/")[-2] if url.endswith("/text") else urlparse(url).path.rstrip("/").split("/")[-1]
-
+    formatted_bill_number = f"({'S.' if is_senate else 'H.R'} {bill_number})"
     # turning numerical dates into spelled-out date
     summary_date = format_date_into_words(summary_date)
 
@@ -174,16 +174,16 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     Write a 300-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
-    - Starts with {'Sen.' if is_senate else 'Rep.'} {last_name}'s [Last Name] Legislation [Bill Name] Analyzed by CRS
+    - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}'s [Last Name] [Bill Name] Analyzed by CRS
     (Do not include the bill number in the headline.)
 
     [NEWLINE SEPARATOR]
 
     First Paragraph:
-    - Start the first line with: [Bill Name] ({'S.' if is_senate else 'H.R'} {bill_number}), introduced by {'Sen.' if is_senate else 'Rep.'} {fullname} on {summary_date}, has been analyzed by the Congressional Research Service. 
-    - There must be a comma both before and after the party-state block — like: Sen. Tim Scott, R-SC,
-    - Summarize the bill’s purpose.
-
+    - DO NOT add any location or dateline at the beginning (e.g., "Washington, D.C. —" or similar).
+    - The first sentence must follow this Exact format: [Bill Name], introduced by {'Sen.' if is_senate else 'Rep.'} {fullname} on {summary_date}, has been analyzed by the Congressional Research Service. 
+    - Be sure to include **commas before and after the party/state**, e.g., Sen. Jane Doe, D-NY,
+    - Immediately follow this sentence with a concise summary of the bill’s purpose in plain, informative language. Prioritize clarity and flow.
 
     Body:
     - Use structured paragraphs.
@@ -222,20 +222,22 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
         headline = clean_text(headline_raw)
         press_body = clean_text(body_raw)
 
-        press_release = f"WASHINGTON, {today_date} -- {press_body.strip()}"
+        press_release = press_body.strip()
 
-        # Add cosponsor summary from CLI
-        # cosummary = generate_cosponsor_summary(url, text, is_senate, bill_number)
-        # if cosummary == -1:
-        #     return "NA", None, None
-        # elif cosummary == 429:
-        #     return "STOP", None, None
-        
-        # press_release += f"\n\n{cosummary}"
+        # checking to see if program actually added the bill number (patching a known problem)
+        if formatted_bill_number not in press_release:
+            index = press_release.find(",") # this will be the place to insert the formatted bill number before
+            press_release = press_release[:index] + " " + formatted_bill_number + press_release[index:]
+
+        # adding editorial formatting
+        press_release = f"WASHINGTON, {today_date} -- {press_release}"
 
         press_release = clean_text(press_release)
         extract_found_ids(press_release)
 
+        if "[Bill Name]" in press_release:
+            return None, None, None
+        
         return filename, headline, press_release
 
     except Exception as e:

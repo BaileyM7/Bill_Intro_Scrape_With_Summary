@@ -224,7 +224,7 @@ def run_tester(num, is_senate):
 
     if not content or not summary or not summary_date:
         logging.debug(f"Didnt have all content summary and summary date for {house.title()} Bill {num}")
-        return "", "", ""
+        return None, None, None
 
     logging.debug(f"Got content for {house.title()} Bill {num} (length={len(content)})")
 
@@ -256,7 +256,10 @@ def populateCsv(num_range):
     for i in range(num_range[0], num_range[1]):
         result = run_tester(i, True)
         logging.debug(f"result for Senate Bill {i}: {result}")
-        bill_intros.append(result)
+
+        # only write row if headline, filename, and press_release are valid
+        if None not in result:
+            bill_intros.append(result)
     
     # running all the bill numbers in the range for senate
     for i in range(num_range[0], num_range[1]):
