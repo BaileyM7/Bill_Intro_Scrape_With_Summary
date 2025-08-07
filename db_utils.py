@@ -267,7 +267,7 @@ def populateCsv(num_range):
     # write to CSV (overwriting if exists)
     with open('test_outputs.csv', 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['FileName', 'Headline', 'Press release'])  # header
+        writer.writerow(['FileName', 'Headline', 'Bill Sum'])  # header
 
         for entry in bill_intros:
             # assuming entry is a tuple like (filename, headline, press_release)
