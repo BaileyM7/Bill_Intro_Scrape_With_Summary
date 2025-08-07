@@ -112,11 +112,11 @@ def main(argv):
         if 'congress.gov' in url and not url.endswith('/text'):
             url += '/text'
 
-        # grabbign the text and the text summary from the bill intro
-        content, summary = getTextandSummary(url, is_senate)
+        # grabbing the text and the text summary from the bill intro
+        content, summary, summary_date = getTextandSummary(url, is_senate)
 
         # if there isnt both summary and text availble, pass it and try again tommorow
-        if not content or not summary:
+        if not content or not summary or not summary_date:
             add_note_to_url(url_id, "No text and/or summary found yet")
             passed += 1
             continue
@@ -127,6 +127,7 @@ def main(argv):
         filename_preview, _, _ = callApiWithText(
             text=content,
             summary=summary,
+            summary_date=summary_date,
             client=client,
             url=url,
             is_senate=is_senate,
@@ -157,10 +158,12 @@ def main(argv):
         # getting all data to put into DB
         filename, headline, press_release = callApiWithText(
             text=content,
+            summary=summary,
+            summary_date=summary_date,
             client=client,
             url=url,
-            is_senate=is_senate, 
-            filename_only=False
+            is_senate=is_senate,
+            filename_only=False  
         )
 
         # if a stop marker is hit, set email summary values accordingly

@@ -26,6 +26,7 @@ def getTextandSummary(url, is_senate):
     headers = {"X-API-Key": api_key}
     summary_text = None
     bill_text = None
+    summary_date = None
 
     # getting the summary in two different ways (Because the congress.gov DB is inconcistant in its way of adding data)
     # The data will either be available via json or xml format, which isnt known at the time of scraping
@@ -41,6 +42,7 @@ def getTextandSummary(url, is_senate):
                 data = summary_resp.json()
                 summaries = data.get("summaries", [])
                 if summaries:
+                    summary_date = summaries[-1].get("actionDate") # this gets the date that the summary was produced
                     latest = summaries[-1]
                     raw_html = latest.get("text", "")
                     summary_text = html.unescape(strip_tags(raw_html))
@@ -55,6 +57,7 @@ def getTextandSummary(url, is_senate):
             summaries = root.findall(".//summary")
             if summaries:
                 latest = summaries[-1]
+                summary_date = latest.find(".//actionDate") # gets the date that the summary was released
                 text_elem = latest.find(".//text")
                 if text_elem is not None and text_elem.text:
                     summary_text = html.unescape(text_elem.text.strip())
@@ -100,7 +103,7 @@ def getTextandSummary(url, is_senate):
                     if type_elem is not None and "Formatted Text" in type_elem.text:
                         formatted_url = url_elem.text.strip()
                         break
-            # print("[XML TEXT] Parsed from fallback XML")
+            print("[XML TEXT] Parsed from fallback XML")
         except Exception as e:
             print(f"Error parsing text XML for {bill_number}: {e}")
     else:
@@ -115,7 +118,7 @@ def getTextandSummary(url, is_senate):
             print(f"Formatted text HTML fetch failed: {raw_html_resp.status_code}")
     # print(bill_text, summary_text)
     # returning the raw bill text and raw summary text
-    return bill_text, summary_text
+    return bill_text, summary_text, summary_date
 
 # gets the primary sponsor of the bill
 def get_primary_sponsor(is_senate, congress_num, bill_number):

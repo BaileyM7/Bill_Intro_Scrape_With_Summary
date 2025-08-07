@@ -220,21 +220,18 @@ def run_tester(num, is_senate):
     house = "senate" if is_senate else "house"
     url = f"https://www.congress.gov/bill/119th-congress/{house}-bill/{num}"
 
-    content, summary = getTextandSummary(url, is_senate)
+    content, summary, summary_date = getTextandSummary(url, is_senate)
 
-    if not summary:
-        logging.debug(f"No summary for {house.title()} Bill {num}")
-        return "", "", "" 
-
-    if not content:
-        logging.debug(f"No content for {house.title()} Bill {num}")
-        return "", "", "" 
+    if not content or not summary or not summary_date:
+        logging.debug(f"Didnt have all content summary and summary date for {house.title()} Bill {num}")
+        return "", "", ""
 
     logging.debug(f"Got content for {house.title()} Bill {num} (length={len(content)})")
 
     filename, headline, press_release = callApiWithText(
         text=content,
         summary=summary,
+        summary_date=summary_date,
         client=client,
         url=url,
         is_senate=is_senate,

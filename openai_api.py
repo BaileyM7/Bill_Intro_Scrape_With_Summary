@@ -75,6 +75,21 @@ def clean_text(text):
     text = text.strip().replace('\"', "").replace('Headline:', "").replace('headline:', "")
     return text
 
+def format_date_into_words(date_str):
+    """
+    Converts a date string in 'YYYY-MM-DD' format to 'Month Day, Year' format.
+    Works on both Linux and Windows.
+    
+    Example:
+        format_date("2025-03-12") -> "March 12, 2025"
+    """
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        formatted = date_obj.strftime("%B %d, %Y")
+        return formatted.replace(" 0", " ")  # Ensures "March 01" -> "March 1"
+    except ValueError:
+        return "Invalid date format"
+
 def get_date_from_text(text, is_file):
     """
     Extract the introduction date after:
@@ -120,7 +135,7 @@ def extract_found_ids(press_release):
     # print(len(found_ids))
     return found_ids
 
-def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
+def callApiWithText(text, summary, summary_date, client, url, is_senate, filename_only=False):
     # gathering info to then create the output for filename, headline, and body
     today = datetime.today()
     text = re.sub(r'https://www\.congress\.gov[^\s]*', '', text)
@@ -130,6 +145,9 @@ def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
     day_format = '%-d' if platform.system() != 'Windows' else '%#d'
     today_date = f"{formatted_month} {today.strftime(day_format)}"
     bill_number = urlparse(url).path.rstrip("/").split("/")[-2] if url.endswith("/text") else urlparse(url).path.rstrip("/").split("/")[-1]
+
+    # turning numerical dates into spelled-out date
+    summary_date = format_date_into_words(summary_date)
 
     file_date = get_date_from_text(text, True)
 
@@ -156,13 +174,13 @@ def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
     Write a 300-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
-    - Starts with {'Sen.' if is_senate else 'Rep.'} {last_name} [Last Name] Introduces [Bill Name]
+    - Starts with {'Sen.' if is_senate else 'Rep.'} {last_name}'s [Last Name] Legislation [Bill Name] Analyzed by CRS
     (Do not include the bill number in the headline.)
 
     [NEWLINE SEPARATOR]
 
     First Paragraph:
-    - Start the first line with: {'Sen.' if is_senate else 'Rep.'} {fullname}
+    - Start the first line with: [Bill Name] ({'S.' if is_senate else 'H.R'} {bill_number}), introduced by {'Sen.' if is_senate else 'Rep.'} {fullname} on {summary_date}, has been analyzed by the Congressional Research Service. 
     - There must be a comma both before and after the party-state block — like: Sen. Tim Scott, R-SC,
     - Summarize the bill’s purpose.
 
@@ -172,10 +190,9 @@ def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
     - No quotes.
     - Add context (motivation, impact, background).
     - Do not mention or list any cosponsors or other legislators by name.
-    - Focus only on the primary sponsor and the bill content.
+    - Focus on the bill’s purpose using the summary mainly, supliment information with the bill text
 
     Bill Details:
-    {'Sen.' if is_senate else 'Rep.'} [Last Name] has introduced [Bill Name]. 
     Summary of the bill:
     {summary}
     Full Bill Text:
@@ -208,13 +225,13 @@ def callApiWithText(text, summary, client, url, is_senate, filename_only=False):
         press_release = f"WASHINGTON, {today_date} -- {press_body.strip()}"
 
         # Add cosponsor summary from CLI
-        cosummary = generate_cosponsor_summary(url, text, is_senate, bill_number)
-        if cosummary == -1:
-            return "NA", None, None
-        elif cosummary == 429:
-            return "STOP", None, None
+        # cosummary = generate_cosponsor_summary(url, text, is_senate, bill_number)
+        # if cosummary == -1:
+        #     return "NA", None, None
+        # elif cosummary == 429:
+        #     return "STOP", None, None
         
-        press_release += f"\n\n{cosummary}"
+        # press_release += f"\n\n{cosummary}"
 
         press_release = clean_text(press_release)
         extract_found_ids(press_release)
