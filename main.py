@@ -71,7 +71,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "sh")
     except getopt.GetoptError:
-        print("Usage: [-p] -s|-h")
+        print("Usage: [-p] -s|-h | -t <start> <end>")
         sys.exit(1)
     
     # getting s or h, cannot do both at the same time
@@ -193,7 +193,7 @@ def main(argv):
     end_time = datetime.now()
     elapsed = str(end_time - start_time).split('.')[0]
     summary = f"""
-Load Version 1.0.0 08/7/2025
+Load Version 1.0.0 08/27/2025
 
 Passed Parameters: {' -t' if test_run else ''}  {' -p' if populate_first else ''} {' -S' if is_senate else ' -H'}
 Pull House and Senate: {'Senate' if is_senate else 'House'}
