@@ -27,7 +27,7 @@ def load_pending_urls_from_db(is_senate):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT id, url FROM url_queue
+            SELECT id, url FROM sum_queue
             WHERE status = 'pending' AND chamber = %s
             LIMIT 2000
         """, ('senate' if is_senate else 'house',))
@@ -40,7 +40,7 @@ def mark_url_processed(url_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE url_queue SET status = 'processed' WHERE id = %s", (url_id,))
+        cursor.execute("UPDATE sum_queue SET status = 'processed' WHERE id = %s", (url_id,))
         conn.commit()
     finally:
         conn.close()
@@ -50,7 +50,7 @@ def mark_url_invalid(url_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE url_queue SET status = 'invalid' WHERE id = %s", (url_id,))
+        cursor.execute("UPDATE sum_queue SET status = 'invalid' WHERE id = %s", (url_id,))
         conn.commit()
     finally:
         conn.close()
@@ -60,7 +60,7 @@ def link_story_to_url(url_id, s_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE url_queue SET story_id = %s WHERE id = %s", (s_id, url_id))
+        cursor.execute("UPDATE sum_queue SET story_id = %s WHERE id = %s", (s_id, url_id))
         conn.commit()
     finally:
         conn.close()
@@ -70,7 +70,7 @@ def add_note_to_url(url_id, message):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE url_queue SET notes = %s WHERE id = %s", (message, url_id))
+        cursor.execute("UPDATE sum_queue SET notes = %s WHERE id = %s", (message, url_id))
         conn.commit()
     finally:
         conn.close()
