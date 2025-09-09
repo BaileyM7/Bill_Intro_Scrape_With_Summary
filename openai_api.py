@@ -142,6 +142,11 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     month = today.strftime('%B') 
     short_month = today.strftime('%b')
     formatted_month = month if len(month) <= 5 else short_month + "."
+
+    # Special case for September
+    if month == "September":
+        formatted_month = "Sept."
+    
     day_format = '%-d' if platform.system() != 'Windows' else '%#d'
     today_date = f"{formatted_month} {today.strftime(day_format)}"
     bill_number = urlparse(url).path.rstrip("/").split("/")[-2] if url.endswith("/text") else urlparse(url).path.rstrip("/").split("/")[-1]

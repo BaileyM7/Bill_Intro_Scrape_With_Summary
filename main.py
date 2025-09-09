@@ -26,12 +26,12 @@ formatter = logging.Formatter("%(name)-12s: %(levelname)-8s %(message)s")
 console.setFormatter(formatter)
 logging.getLogger("").addHandler(console)
 
-# mian runner
+# main runner
 def main(argv):
-    # intializing starting variables
+    # initializing starting variables
     start_time = datetime.now()
 
-    # these will be tallied to be sent in the summary email
+    # tallies for summary email
     processed, skipped, total_urls, passed = 0, 0, 0, 0
     test_run = False
     is_senate = None
@@ -40,59 +40,58 @@ def main(argv):
     test_range = None
     populate_first = False
 
-    # frist check if -t mode (test mode using the csv instead)
-    if '-t' in argv:
-
-        # -t can be used with any other args
-        if '-p' in argv or '-s' in argv or '-h' in argv:
-            print("Error: -t cannot be used with -p, -s, or -h")
-            sys.exit(1)
-
-        t_index = argv.index('-t')
-        try:
-            # getting the start and end range of the house and senate bills to be tested
-            start = int(argv[t_index + 1])
-            end = int(argv[t_index + 2])
-            test_range = (start, end)
-            test_run = True
-        except (IndexError, ValueError):
-            print("Error: -t must be followed by two integer arguments")
-            sys.exit(1)
-
-        # run -t and exit early
-        populateCsv(test_range)
-        return
-
-    # if not in test mode: process -p, -s, -h
-    if '-p' in argv:
-        populate_first = True
-        argv.remove('-p')
-
     try:
-        opts, args = getopt.getopt(argv, "sh")
+        # -t takes two arguments, so specify "t:" in the option string
+        opts, args = getopt.getopt(argv, "shpt:")
     except getopt.GetoptError:
         print("Usage: [-p] -s|-h | -t <start> <end>")
         sys.exit(1)
-    
-    # getting s or h, cannot do both at the same time
-    for opt, _ in opts:
+
+    # parse options
+    for opt, arg in opts:
         if opt == "-s":
+            if is_senate is False:
+                print("Error: cannot specify both -s and -h")
+                sys.exit(1)
             is_senate = True
             a_id = 56
         elif opt == "-h":
+            if is_senate is True:
+                print("Error: cannot specify both -s and -h")
+                sys.exit(1)
             is_senate = False
             a_id = 57
+        elif opt == "-p":
+            populate_first = True
+        elif opt == "-t":
+            # -t mode: special case
+            if is_senate is not None or populate_first:
+                print("Error: -t cannot be used with -p, -s, or -h")
+                sys.exit(1)
+            try:
+                # arg is the first number, args should still contain the second
+                start = int(arg)
+                if not args:
+                    raise ValueError("Missing second integer for -t")
+                end = int(args[0])
+                test_range = (start, end)
+                test_run = True
+            except (ValueError, IndexError):
+                print("Error: -t must be followed by two integer arguments (e.g., -t 100 120)")
+                sys.exit(1)
 
+            # run -t and exit early
+            populateCsv(test_range)
+            return
+
+    # ensure s or h provided (unless in test mode, already returned)
     if is_senate is None:
         print("Error: Must specify -s or -h (unless using -t)")
         sys.exit(1)
 
-    # this populates the TNS DB with new bills found
+    # populate DB if requested
     if populate_first:
         populateDB()
-
-    if test_run:
-        populateCsv(test_range)
 
     # gets up to 2000 new bill urls per day (checked in smaller batches as to not rack up run time)
     url_rows = load_pending_urls_from_db(is_senate)  
@@ -193,7 +192,7 @@ def main(argv):
     end_time = datetime.now()
     elapsed = str(end_time - start_time).split('.')[0]
     summary = f"""
-Load Version 1.0.0 08/27/2025
+Load Version 1.0.1 09/08/2025
 
 Passed Parameters: {' -t' if test_run else ''}  {' -p' if populate_first else ''} {' -S' if is_senate else ' -H'}
 Pull House and Senate: {'Senate' if is_senate else 'House'}
