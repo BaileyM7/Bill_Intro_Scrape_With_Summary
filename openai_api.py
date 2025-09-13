@@ -245,6 +245,9 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
         if "[Bill Name]" in press_release or "[BILL NAME]" in press_release or "bill title" in press_release or "BILL TITLE" in press_release:
             return None, None, None
         
+        # making headline correct TNS syntax 
+        headline = headline.replace("'", "")
+        
         return filename, headline, press_release
 
     except Exception as e:
