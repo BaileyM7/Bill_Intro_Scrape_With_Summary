@@ -174,19 +174,21 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     if fullname == "" or last_name == "":
         # add_invalid_url(url)
         return "NA", None, None
-
+    
+    # print(text)
+    
     prompt = f"""
     Write a 300-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
-    - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}s [Last Name] [Bill Name] Analyzed by CRS
+    - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}s [bill title here] Analyzed by CRS
     (Do not include the bill number in the headline.)
 
     [NEWLINE SEPARATOR]
 
     First Paragraph:
     - DO NOT add any location or dateline at the beginning (e.g., "Washington, D.C. —" or similar).
-    - The first sentence must follow this Exact format: [Bill Name], introduced by {'Sen.' if is_senate else 'Rep.'} {fullname} on {summary_date}, has been analyzed by the Congressional Research Service. 
+    - The first sentence must follow this Exact format: [bill title here], introduced by {'Sen.' if is_senate else 'Rep.'} {fullname} on {summary_date}, has been analyzed by the Congressional Research Service. 
     - Be sure to include **commas before and after the party/state**, e.g., Sen. Jane Doe, D-NY,
     - Immediately follow this sentence with a concise summary of the bill’s purpose in plain, informative language. Prioritize clarity and flow.
 
@@ -240,7 +242,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
         press_release = clean_text(press_release)
         extract_found_ids(press_release)
 
-        if "[Bill Name]" in press_release:
+        if "[Bill Name]" in press_release or "[BILL NAME]" in press_release or "bill title" in press_release or "BILL TITLE" in press_release:
             return None, None, None
         
         return filename, headline, press_release
