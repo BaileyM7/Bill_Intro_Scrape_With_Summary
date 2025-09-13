@@ -18,8 +18,11 @@ def getTextandSummary(url, is_senate):
         api_key = f.read().strip()
 
     congress = 119 # to be changed when a new congress starts
-    bill_number = url.rstrip("/").split("/")[-1]
-    print("Bill number:", bill_number)
+    parts = url.rstrip("/").split("/")
+    bill_number = parts[-1]
+    if bill_number == "text":  # handle trailing /text URLs
+        bill_number = parts[-2]
+    print("HIA Bill number:", bill_number)
 
     # setting up headers and variables based off of whether it is a house or senate bill
     bill_type = "s" if is_senate else "hr"
