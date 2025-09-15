@@ -181,7 +181,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     Write a 300-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
-    - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}s [bill title here] Analyzed by CRS
+    - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}: [bill title here] Analyzed by CRS
     (Do not include the bill number in the headline.)
 
     [NEWLINE SEPARATOR]
@@ -246,7 +246,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
             return None, None, None
         
         # making headline correct TNS syntax 
-        headline = headline.replace("'", "")
+        headline = headline.replace("'", "").replace("'s", "")
         
         return filename, headline, press_release
 
