@@ -9,6 +9,7 @@ from openai_api import callApiWithText, OpenAI
 from url_processing import get_most_recent_bill_number, getTextandSummary, extract_sponsor_phrase
 from shared_utils import getKey
 import openai_api
+from main import SELECT_LIMIT
 
 # getts the db connection
 def get_db_connection(yml_path="configs/db_config.yml"):
@@ -21,17 +22,19 @@ def get_db_connection(yml_path="configs/db_config.yml"):
         database=config["database"]
     )
 
-# loads up to 2000 house or senate urls that are still pending
+# loads up to SELECT_LIMIT house or senate urls that are still pending
 def load_pending_urls_from_db(is_senate):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
+        chamber = 'senate' if is_senate else 'house'
+        query = f"""
             SELECT id, url FROM sum_queue
             WHERE status = 'pending' AND chamber = %s
-            LIMIT 2000
-        """, ('senate' if is_senate else 'house',))
-        return cursor.fetchall()  # returns list of (id, url)
+            LIMIT {SELECT_LIMIT}
+        """
+        cursor.execute(query, (chamber,))
+        return cursor.fetchall()
     finally:
         conn.close()
 

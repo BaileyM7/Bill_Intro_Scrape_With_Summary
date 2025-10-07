@@ -150,7 +150,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     day_format = '%-d' if platform.system() != 'Windows' else '%#d'
     today_date = f"{formatted_month} {today.strftime(day_format)}"
     bill_number = urlparse(url).path.rstrip("/").split("/")[-2] if url.endswith("/text") else urlparse(url).path.rstrip("/").split("/")[-1]
-    formatted_bill_number = f"({'S.' if is_senate else 'H.R'} {bill_number})"
+    formatted_bill_number = f"({'S.' if is_senate else 'H.R.'} {bill_number})"
     # turning numerical dates into spelled-out date
     summary_date = format_date_into_words(summary_date)
 
@@ -178,7 +178,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     # print(text)
     
     prompt = f"""
-    Write a 300-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
+    Write around a {len(summary)}-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
     - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}: [bill title here] Analyzed by CRS

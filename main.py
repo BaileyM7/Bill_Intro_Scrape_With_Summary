@@ -28,11 +28,15 @@ logging.getLogger("").addHandler(console)
 
 # main runner
 def main(argv):
+    # This is the limit of how many elements can be selected from the SQL Database
+    global SELECT_LIMIT
+    SELECT_LIMIT = 2000
+
     # initializing starting variables
     start_time = datetime.now()
 
     # tallies for summary email
-    processed, skipped, total_urls, passed = 0, 0, 0, 0
+    processed, skipped, total_urls, passed, too_short = 0, 0, 0, 0, 0
     test_run = False
     is_senate = None
     a_id = 0
@@ -88,7 +92,15 @@ def main(argv):
     if is_senate is None:
         print("Error: Must specify -s or -h (unless using -t)")
         sys.exit(1)
-
+        
+    if populate_first and args:
+        try:
+            SELECT_LIMIT = int(args[0])
+            logging.info(f"Global limit set to {SELECT_LIMIT}")
+        except ValueError:
+            print("Error: optional limit after -ps or -ph must be an integer (e.g., -ps 1000)")
+            sys.exit(1)
+   
     # populate DB if requested
     if populate_first:
         populateDB()
@@ -113,6 +125,14 @@ def main(argv):
 
         # grabbing the text and the text summary from the bill intro
         content, summary, summary_date = getTextandSummary(url, is_senate)
+        
+        # making sure > 300 word count
+        sum_words = summary.split()
+
+        if len(sum_words) < 300:
+            add_note_to_url(url_id, "Summary Found, but too short. (<300 words)")
+            too_short += 1
+            continue
 
         # if there isnt both summary and text availble, pass it and try again tommorow
         if not content or not summary or not summary_date:
@@ -178,7 +198,10 @@ def main(argv):
         
         # if all data is valid, insert story into TNS DB
         if filename and headline and press_release:
-            full_text = press_release + f"\n\n* * # * *\n\nPrimary source of information: {url}"
+            # getting rid of the "/text" at the end of the url
+            clean_url = url.removesuffix("/text")
+
+            full_text = press_release + f"\n\n* * # * *\n\nPrimary source of information: {clean_url}"
             s_id = insert_story(filename, headline, full_text, a_id, bill_sponsor_blob)
             if s_id:
                 mark_url_processed(url_id)
@@ -192,14 +215,17 @@ def main(argv):
     end_time = datetime.now()
     elapsed = str(end_time - start_time).split('.')[0]
     summary = f"""
-Load Version 1.0.2 09/15/2025
+Load Version 1.1.0 10/06/2025
 
 Passed Parameters: {' -t' if test_run else ''}  {' -p' if populate_first else ''} {' -S' if is_senate else ' -H'}
 Pull House and Senate: {'Senate' if is_senate else 'House'}
 
 Docs Loaded: {processed}
+
 URLS skipped due to duplication: {skipped}
 URLS held for re-evaluation: {passed}
+URLS skipped because too short (<300 words): {too_short}
+
 Total URLS looked at: {total_urls}
 
 Stopped Due to Rate Limit: {stopped}
