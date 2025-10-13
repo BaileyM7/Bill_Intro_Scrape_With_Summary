@@ -9,7 +9,7 @@ from openai_api import callApiWithText, OpenAI
 from url_processing import get_most_recent_bill_number, getTextandSummary, extract_sponsor_phrase
 from shared_utils import getKey
 import openai_api
-from main import SELECT_LIMIT
+from config import SELECT_LIMIT
 
 # getts the db connection
 def get_db_connection(yml_path="configs/db_config.yml"):
@@ -224,6 +224,13 @@ def run_tester(num, is_senate):
     url = f"https://www.congress.gov/bill/119th-congress/{house}-bill/{num}"
 
     content, summary, summary_date = getTextandSummary(url, is_senate)
+
+    # making sure that the summary is greater than 300 words: 
+        # making sure > 300 word count
+    sum_words = summary.split()
+
+    if len(sum_words) < 300:
+        return None, None, None
 
     if not content or not summary or not summary_date:
         logging.debug(f"Didnt have all content summary and summary date for {house.title()} Bill {num}")

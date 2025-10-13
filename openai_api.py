@@ -178,7 +178,7 @@ def callApiWithText(text, summary, summary_date, client, url, is_senate, filenam
     # print(text)
     
     prompt = f"""
-    Write around a {len(summary)}-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
+    Write around a {len(summary.split())}-word news story about this {'Senate' if is_senate else 'House'} bill, following these rules:
 
     Headline:
     - Follow this Exact Format: {'Sen.' if is_senate else 'Rep.'} {last_name}: [bill title here] Analyzed by CRS
