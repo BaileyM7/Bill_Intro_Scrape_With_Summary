@@ -225,17 +225,18 @@ def run_tester(num, is_senate):
 
     content, summary, summary_date = getTextandSummary(url, is_senate)
 
-    # making sure that the summary is greater than 300 words: 
-        # making sure > 300 word count
-    sum_words = summary.split()
-
-    if len(sum_words) < 300:
-        return None, None, None
-
     if not content or not summary or not summary_date:
         logging.debug(f"Didnt have all content summary and summary date for {house.title()} Bill {num}")
         return None, None, None
 
+    # making sure that the summary is greater than 300 words: 
+    # making sure > 300 word count
+    sum_words = summary.split()
+
+    if len(sum_words) < 300:
+        logging.debug(f"Summary too short for {house.title()} Bill {num}")
+        return None, None, None
+    
     logging.debug(f"Got content for {house.title()} Bill {num} (length={len(content)})")
 
     filename, headline, press_release = callApiWithText(
